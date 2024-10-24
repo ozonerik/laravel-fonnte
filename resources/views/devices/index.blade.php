@@ -120,6 +120,23 @@
         </div>
     </div>
 
+    <div id="otpDeleteAuthorization" class="fixed inset-0 z-50 hidden bg-gray-500 bg-opacity-75" role="dialog"
+        aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="w-full max-w-lg p-6 bg-white rounded-lg shadow-xl">
+                <h2 class="text-lg font-bold">Otorisasi</h2>
+                <p id="confirmDeleteMessage">Masukan kode OTP yang dikirimkan ke nomor ini</p>
+                <form id="otpAuthorizationForm">
+                    <input class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" name="otp"/>
+                    <div class="flex justify-end mt-4">
+                        <button class="px-4 py-2 text-white bg-red-500 rounded hover:bg-red-600" type="submit">Confirm</button>
+                        <button class="px-4 py-2 ml-2 text-gray-700 border border-gray-300 rounded hover:bg-gray-100" type="button" onclick="closeOtpDeleteAuthorization()">Cancel</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal for displaying the QR code -->
     <div id="deviceModal" class="fixed inset-0 z-50 hidden bg-gray-500 bg-opacity-75" role="dialog" aria-modal="true">
         <div class="flex items-center justify-center min-h-screen p-4">
@@ -296,8 +313,7 @@
 
         function confirmDelete(deviceId, deviceName) {
             deviceIdToDelete = deviceId; // Store the device ID to delete
-            document.getElementById('confirmDeleteMessage').innerText =
-                `Are you sure you want to delete the device "${deviceName}"?`;
+            document.getElementById('confirmDeleteMessage').innerText = `Are you sure you want to delete the device "${deviceName}"?`;
             document.getElementById('confirmDeleteModal').classList.remove('hidden'); // Show confirmation modal
         }
 
@@ -306,10 +322,66 @@
             deviceIdToDelete = null; // Reset the device ID
         }
 
-        function deleteDevice() {
+        function deleteDevice(otp = null) {
+            if (otp) {
+                let formData = new FormData();
+
+                formData.append('_token', "{{ csrf_token() }}")
+                formData.append('_method', "DELETE")
+                formData.append('otp', otp)
+
+                try {
+                    const response = fetch('/devices/' + deviceIdToDelete, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-with': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+
+                    const result = response.json();
+
+                    document.getElementById('otpDeleteAuthorization').classList.add('hidden');
+                    deviceIdToDelete = null
+                    alert(result.message);
+
+                    window.location.reload()
+
+                } catch (error) {
+                    // console.error('Error:', error);
+                    showError('Terjadi kesalahan. Coba lagi.');
+                }
+
+                return;
+            }
+
             if (deviceIdToDelete) {
-                // Redirect to delete route
-                window.location.href = `/devices/${deviceIdToDelete}/delete`; // Replace with the correct route
+                document.getElementById('otpDeleteAuthorization').classList.remove('hidden');
+                document.getElementById('confirmDeleteModal').classList.add('hidden'); // Hide confirmation modal
+
+                let formData = new FormData();
+
+                formData.append('_token', "{{ csrf_token() }}")
+                formData.append('_method', "DELETE")
+
+                try {
+                    const response = fetch('/devices/' + deviceIdToDelete, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-with': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+
+                    const result = response.json();
+
+                    console.log(result)
+                } catch (error) {
+                    // console.error('Error:', error);
+                    showError('Terjadi kesalahan. Coba lagi.');
+                }
+
+                return;
             }
         }
 
@@ -324,12 +396,25 @@
             clearError(); // Bersihkan error setelah modal ditutup
         }
 
+        function closeOtpDeleteAuthorization() {
+            document.getElementById('otpDeleteAuthorization').classList.add('hidden');
+            clearError(); // Bersihkan error setelah modal ditutup
+        }
+
         function clearError() {
             const errorContainer = document.getElementById('errorContainer');
             const errorMessage = document.getElementById('errorMessage');
             errorContainer.classList.add('hidden');
             errorMessage.textContent = '';
         }
+
+        document.getElementById('otpAuthorizationForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const formData = new FormData(this);
+
+            deleteDevice(formData.get('otp'))
+        })
 
         document.getElementById('sendMessageForm').addEventListener('submit', async function(event) {
             event.preventDefault();

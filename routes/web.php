@@ -24,8 +24,8 @@ Route::middleware('auth')->group(function () {
     Route::post('send-message', [DeviceController::class, 'sendMessage'])->name('send.message');
     Route::post('devices/status', [DeviceController::class, 'checkDeviceStatus']);
     Route::post('devices/activate', [DeviceController::class, 'activateDevice'])->name('devices.activate');
-    Route::post('devices/request-otp', [DeviceController::class, 'requestOTPForDeleteDevice'])->name('devices.requestOtp');
-    Route::post('devices/submit-otp', [DeviceController::class, 'submitOTPForDeleteDevice'])->name('devices.submitOTP');
+    // Route::post('devices/request-otp', [DeviceController::class, 'requestOTPForDeleteDevice'])->name('devices.requestOtp');
+    // Route::post('devices/submit-otp', [DeviceController::class, 'submitOTPForDeleteDevice'])->name('devices.submitOTP');
 });
 
 require __DIR__ . '/auth.php';

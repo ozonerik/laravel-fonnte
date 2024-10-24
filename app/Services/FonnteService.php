@@ -45,7 +45,7 @@ class FonnteService
         // Log respons untuk memudahkan debugging
         Log::info('Fonnte API Response', ['endpoint' => $endpoint, 'response' => $response->json()]);
 
-        if ($response->failed()) {
+        if ($response->failed() || $response->json()['status'] == false) {
             return [
                 'status' => false,
                 'error'  => $response->json()['reason'] ?? 'Unknown error occurred',
@@ -141,48 +141,14 @@ class FonnteService
     // Method untuk request OTP menggunakan token perangkat
     public function requestOTPForDeleteDevice($deviceToken)
     {
-        return $this->makeRequest(self::ENDPOINTS['delete_device'], ['otp' => ''], true, $deviceToken);
+        return $this->makeRequest(self::ENDPOINTS['delete_device'], ['otp' => ''], false, $deviceToken);
     }
 
     public function submitOTPForDeleteDevice($otp, $deviceToken)
     {
-        Log::info('Mengirim OTP untuk menghapus perangkat', ['otp' => $otp, 'device_token' => $deviceToken]);
+        Log::info('Menghapus perangkat dengan OTP', ['otp' => $otp, 'device_token' => $deviceToken]);
 
-        $response = Http::withHeaders([
-            'Authorization' => $deviceToken, // Gunakan device_token yang diberikan dari tabel NotificationDevice
-        ])->post(self::ENDPOINTS['delete_device'], [
-            'otp' => $otp,
-        ]);
-
-        Log::info('Response dari Fonnte untuk submit OTP', ['response' => $response->json()]);
-
-        if ($response->failed()) {
-            Log::error('Gagal menghapus perangkat di Fonnte', ['error' => $response->body()]);
-
-            return [
-                'status' => false,
-                'error' => $response->json()['reason'] ?? 'Unknown error occurred',
-            ];
-        }
-
-        $responseData = $response->json();
-
-        if (isset($responseData['status']) && $responseData['status'] === false) {
-            Log::error('Fonnte API mengembalikan error saat penghapusan perangkat', ['reason' => $responseData['reason']]);
-
-            return [
-                'status' => false,
-                'error' => $responseData['reason'] ?? 'An error occurred',
-                'data' => $responseData,
-            ];
-        }
-
-        Log::info('Perangkat berhasil dihapus di Fonnte', ['response' => $responseData]);
-
-        return [
-            'status' => true,
-            'data' => $responseData,
-        ];
+        return $this->makeRequest(self::ENDPOINTS['delete_device'], ['otp' => (int) $otp], false, $deviceToken);
     }
 
     public function getDeviceStatus($phoneNumber)

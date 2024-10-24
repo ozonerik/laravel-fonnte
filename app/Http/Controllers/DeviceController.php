@@ -175,17 +175,40 @@ class DeviceController extends Controller
     }
 
     // Menghapus perangkat
-    public function destroy($deviceId)
+    public function destroy($deviceId, Request $request)
     {
-        $device = Device::findOrFail($deviceId);
-        $device->delete();
+        // $deviceOnFonnteService      = $this->fonnteService->getDeviceProfile($deviceId);
+        $deviceOnLocal              = Device::where('token', $deviceId)->first();
 
-        return redirect()->route('devices.index')
-            ->with('success', 'Perangkat berhasil dihapus!');
+        if(!$deviceOnLocal) {
+            return response()->json(['message' => 'Device tidak ada, silahkan hapus melalui portal fonnte'], 404);
+        }
+
+        if($request->otp) {
+            $delete = $this->fonnteService->submitOTPForDeleteDevice($request->otp, $deviceOnLocal->token);
+
+            if($delete['status'] == false) {
+                return response()->json(['message' => 'Terjadi kesalahan', 'error' => $delete['error']]);
+            }
+
+            if($deviceOnLocal) {
+                $deviceOnLocal->delete();
+            }
+
+            return response()->json(['message' => 'Berhasil menghapus'. $deviceOnLocal->name . '('.$deviceOnLocal->device . ')']);
+        }
+
+        $requestToken               = $this->fonnteService->requestOTPForDeleteDevice($deviceOnLocal->token);
+
+        if($requestToken['status'] == true) {
+            return response()->json(['message' => 'Berhasil mengirim token']);
+        }
+
+        return response()->json(['message' => 'Gagal mengirim token', 'error' => $requestToken['error']], 500);
     }
 
     // Mengirim request OTP untuk penghapusan perangkat
-    public function requestOTPForDeleteDevice($notificationId, $deviceId)
+    protected function requestOTPForDeleteDevice($notificationId, $deviceId)
     {
         $device = Device::findOrFail($deviceId);
         $response = $this->fonnteService->requestOTPForDeleteDevice($device->token);
@@ -198,7 +221,7 @@ class DeviceController extends Controller
     }
 
     // Mengirim OTP untuk menghapus perangkat setelah OTP diisi
-    public function submitOTPForDeleteDevice(Request $request, $deviceId)
+    protected function submitOTPForDeleteDevice(Request $request, $deviceId)
     {
         $device = Device::findOrFail($deviceId);
         $otp = $request->input('otp');
