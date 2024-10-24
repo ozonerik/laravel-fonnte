@@ -126,8 +126,11 @@
             <div class="w-full max-w-lg p-6 bg-white rounded-lg shadow-xl">
                 <h2 class="text-lg font-bold">Otorisasi</h2>
                 <p id="confirmDeleteMessage">Masukan kode OTP yang dikirimkan ke nomor ini</p>
+                <div id="errorContainerOTP" class="hidden mb-4">
+                    <p class="font-medium text-red-500" id="errorMessageOTP"></p>
+                </div>
                 <form id="otpAuthorizationForm">
-                    <input class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" name="otp"/>
+                    <input class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" name="otp" required/>
                     <div class="flex justify-end mt-4">
                         <button class="px-4 py-2 text-white bg-red-500 rounded hover:bg-red-600" type="submit">Confirm</button>
                         <button class="px-4 py-2 ml-2 text-gray-700 border border-gray-300 rounded hover:bg-gray-100" type="button" onclick="closeOtpDeleteAuthorization()">Cancel</button>
@@ -323,36 +326,27 @@
         }
 
         function deleteDevice(otp = null) {
+            const errorContainer = document.getElementById('errorContainerOTP');
+            const errorMessage = document.getElementById('errorMessageOTP');
+
+            errorContainer.classList.remove('hidden');
             if (otp) {
-                let formData = new FormData();
 
-                formData.append('_token', "{{ csrf_token() }}")
-                formData.append('_method', "DELETE")
-                formData.append('otp', otp)
-
-                try {
-                    const response = fetch('/devices/' + deviceIdToDelete, {
-                        method: 'POST',
-                        headers: {
-                            'X-Requested-with': 'XMLHttpRequest'
-                        },
-                        body: formData
-                    });
-
-                    const result = response.json();
-
+                axios.post('/devices/' + deviceIdToDelete, {
+                    '_token': "{{ csrf_token() }}",
+                    '_method': "DELETE",
+                    'otp': otp
+                }).then((response) => {
                     document.getElementById('otpDeleteAuthorization').classList.add('hidden');
                     deviceIdToDelete = null
-                    alert(result.message);
-
                     window.location.reload()
-
-                } catch (error) {
-                    // console.error('Error:', error);
-                    showError('Terjadi kesalahan. Coba lagi.');
-                }
-
-                return;
+                    return;
+                })
+                .catch((error) => {
+                    errorMessage.textContent = error.response.data.error;
+                    errorContainer.classList.remove('hidden');
+                    return;
+                })
             }
 
             if (deviceIdToDelete) {
@@ -377,8 +371,7 @@
 
                     console.log(result)
                 } catch (error) {
-                    // console.error('Error:', error);
-                    showError('Terjadi kesalahan. Coba lagi.');
+                    console.error('Error:', error);
                 }
 
                 return;
@@ -408,7 +401,7 @@
             errorMessage.textContent = '';
         }
 
-        document.getElementById('otpAuthorizationForm').addEventListener('submit', async function(event) {
+        document.getElementById('otpAuthorizationForm').addEventListener('submit', function(event) {
             event.preventDefault();
 
             const formData = new FormData(this);

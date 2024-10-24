@@ -188,7 +188,7 @@ class DeviceController extends Controller
             $delete = $this->fonnteService->submitOTPForDeleteDevice($request->otp, $deviceOnLocal->token);
 
             if($delete['status'] == false) {
-                return response()->json(['message' => 'Terjadi kesalahan', 'error' => $delete['error']]);
+                return response()->json(['message' => 'Terjadi kesalahan', 'error' => $delete['error']], 501);
             }
 
             if($deviceOnLocal) {
