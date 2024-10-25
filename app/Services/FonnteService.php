@@ -45,7 +45,7 @@ class FonnteService
         // Log respons untuk memudahkan debugging
         Log::info('Fonnte API Response', ['endpoint' => $endpoint, 'response' => $response->json()]);
 
-        if ($response->failed() || $response->json()['status'] == false) {
+        if ($response->failed()) {
             return [
                 'status' => false,
                 'error'  => $response->json()['reason'] ?? 'Unknown error occurred',
@@ -133,9 +133,9 @@ class FonnteService
         return $this->makeRequest(self::ENDPOINTS['device_profile'], [], false, $deviceToken);
     }
 
-    public function disconnectDevice()
+    public function disconnectDevice($deviceToken)
     {
-        return $this->makeRequest(self::ENDPOINTS['disconnect']);
+        return $this->makeRequest(self::ENDPOINTS['disconnect'], [], false, $deviceToken);
     }
 
     // Method untuk request OTP menggunakan token perangkat

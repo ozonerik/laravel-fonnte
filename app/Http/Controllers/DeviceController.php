@@ -55,27 +55,6 @@ class DeviceController extends Controller
         return view('devices.index', compact('devices', 'page_title'));
     }
 
-
-    private function fetchDeviceStatuses()
-    {
-        $accountToken = config('services.fonnte.token'); // Assuming you have your token stored in config/services.php
-        $curl = curl_init();
-
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => 'https://api.fonnte.com/get-devices',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => array(
-                'Authorization: ' . $accountToken,
-            ),
-        ));
-
-        $response = curl_exec($curl);
-        curl_close($curl);
-
-        return json_decode($response, true);
-    }
-
-
     public function create()
     {
         return view('devices.create'); // Menampilkan halaman form penambahan device
@@ -127,20 +106,11 @@ class DeviceController extends Controller
 
     public function activateDevice(Request $request)
     {
-        $deviceToken = $request->input('token'); // Get the device token from the request
-
-        // Assuming you need the WhatsApp number associated with the device
-        $device = Device::where('token', $deviceToken)->first();
-
-        if (!$device) {
-            return response()->json([
-                'status' => false,
-                'error' => 'Device not found.'
-            ], 404);
-        }
+        $phoneNumber = $request->input('device');
+        $deviceToken = $request->input('token');
 
         // Call the FonnteService to activate the device using its WhatsApp number
-        $response = $this->fonnteService->requestQRActivation($device->device, $deviceToken);
+        $response = $this->fonnteService->requestQRActivation($phoneNumber, $deviceToken);
 
         if ($response['status']) {
             // Assuming the QR code is returned in the 'url' key
@@ -174,33 +144,41 @@ class DeviceController extends Controller
         ], 500);
     }
 
+    public function disconnect(Request $request)
+    {
+        try {
+            $deviceToken = $request->input('token');
+            $response = $this->fonnteService->disconnectDevice($deviceToken);
+
+            // Jika API mengembalikan status sukses
+            if ($response['status'] === true) {
+                return response()->json(['message' => 'Device disconnected successfully'], 200); // Status 200 untuk sukses
+            }
+
+            // Jika terjadi kesalahan pada respons dari API
+            return response()->json(['error' => $response['error'] ?? 'Failed to disconnect device'], 500);
+        } catch (\Exception $e) {
+            Log::error($e->getMessage());
+            return response()->json(['error' => 'Internal Server Error'], 500);
+        }
+    }
+
     // Menghapus perangkat
     public function destroy($deviceId, Request $request)
     {
-        // $deviceOnFonnteService      = $this->fonnteService->getDeviceProfile($deviceId);
-        $deviceOnLocal              = Device::where('token', $deviceId)->first();
+        if ($request->otp) {
+            $delete = $this->fonnteService->submitOTPForDeleteDevice($request->otp, $deviceId);
 
-        if(!$deviceOnLocal) {
-            return response()->json(['message' => 'Device tidak ada, silahkan hapus melalui portal fonnte'], 404);
-        }
-
-        if($request->otp) {
-            $delete = $this->fonnteService->submitOTPForDeleteDevice($request->otp, $deviceOnLocal->token);
-
-            if($delete['status'] == false) {
+            if ($delete['status'] == false) {
                 return response()->json(['message' => 'Terjadi kesalahan', 'error' => $delete['error']], 501);
             }
 
-            if($deviceOnLocal) {
-                $deviceOnLocal->delete();
-            }
-
-            return response()->json(['message' => 'Berhasil menghapus'. $deviceOnLocal->name . '('.$deviceOnLocal->device . ')']);
+            return response()->json(['message' => 'Device berhasil dihapus']);
         }
 
-        $requestToken               = $this->fonnteService->requestOTPForDeleteDevice($deviceOnLocal->token);
+        $requestToken               = $this->fonnteService->requestOTPForDeleteDevice($deviceId);
 
-        if($requestToken['status'] == true) {
+        if ($requestToken['status'] == true) {
             return response()->json(['message' => 'Berhasil mengirim token']);
         }
 
@@ -263,32 +241,31 @@ class DeviceController extends Controller
     }
 
     public function sendMessage(Request $request)
-{
-    // Validasi input
-    $request->validate([
-        'target' => 'required|string',
-        'message' => 'required|string',
-    ]);
+    {
+        // Validasi input
+        $request->validate([
+            'target' => 'required|string',
+            'message' => 'required|string',
+        ]);
 
-    $deviceToken = $request->header('Authorization'); // Ambil token dari header
+        $deviceToken = $request->header('Authorization'); // Ambil token dari header
 
-    // Hilangkan prefix 'Bearer ' jika ada
-    if (str_starts_with($deviceToken, 'Bearer ')) {
-        $deviceToken = substr($deviceToken, 7);
+        // Hilangkan prefix 'Bearer ' jika ada
+        if (str_starts_with($deviceToken, 'Bearer ')) {
+            $deviceToken = substr($deviceToken, 7);
+        }
+
+        $response = $this->fonnteService->sendWhatsAppMessage(
+            $request->input('target'),
+            $request->input('message'),
+            $deviceToken
+        );
+
+        if (!$response['status'] || (isset($response['data']['status']) && !$response['data']['status'])) {
+            $errorReason = $response['data']['reason'] ?? 'Unknown error occurred';
+            return response()->json(['message' => 'Error', 'error' => $errorReason], 500);
+        }
+
+        return response()->json(['message' => 'Pesan berhasil dikirim!', 'data' => $response['data']]);
     }
-
-    $response = $this->fonnteService->sendWhatsAppMessage(
-        $request->input('target'),
-        $request->input('message'),
-        $deviceToken
-    );
-
-    if (!$response['status'] || (isset($response['data']['status']) && !$response['data']['status'])) {
-        $errorReason = $response['data']['reason'] ?? 'Unknown error occurred';
-        return response()->json(['message' => 'Error', 'error' => $errorReason], 500);
-    }
-
-    return response()->json(['message' => 'Pesan berhasil dikirim!', 'data' => $response['data']]);
-}
-
 }
