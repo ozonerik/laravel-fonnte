@@ -70,9 +70,17 @@
                                             onclick="openSendMessageModal('{{ $device['token'] }}')">
                                             Send Message
                                         </button>
-                                        <button class="px-4 py-2 text-white bg-red-500 rounded"
-                                            onclick="activateDevice('{{ $device['token'] }}', this)">
+                                        <button class="px-4 py-2 text-white bg-red-500 rounded disconnectButton"
+                                            data-device-token="{{ $device['token'] }}"
+                                            onclick="disconnectDevice('{{ $device['token'] }}')">
                                             Disconnect
+                                            <svg class="hidden w-5 h-5 ml-2 text-white disconnectSpinner animate-spin"
+                                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                    stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                            </svg>
                                         </button>
                                     @else
                                         <button class="px-4 py-2 text-white bg-green-500 rounded"
@@ -130,18 +138,22 @@
                     <p class="font-medium text-red-500" id="errorMessageOTP"></p>
                 </div>
                 <form id="otpAuthorizationForm">
-                    <input class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" name="otp" required/>
+                    <input class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        name="otp" required />
                     <div class="flex justify-end mt-4">
-                        <button class="px-4 py-2 text-white bg-red-500 rounded hover:bg-red-600" type="submit">Confirm</button>
-                        <button class="px-4 py-2 ml-2 text-gray-700 border border-gray-300 rounded hover:bg-gray-100" type="button" onclick="closeOtpDeleteAuthorization()">Cancel</button>
+                        <button class="px-4 py-2 text-white bg-red-500 rounded hover:bg-red-600"
+                            type="submit">Confirm</button>
+                        <button class="px-4 py-2 ml-2 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+                            type="button" onclick="closeOtpDeleteAuthorization()">Cancel</button>
                     </div>
-                </div>
+            </div>
             </form>
         </div>
     </div>
 
     <!-- Modal for displaying the QR code -->
-    <div id="deviceModal" class="fixed inset-0 z-50 hidden bg-gray-500 bg-opacity-75" role="dialog" aria-modal="true">
+    <div id="deviceModal" class="fixed inset-0 z-50 hidden bg-gray-500 bg-opacity-75" role="dialog"
+        aria-modal="true">
         <div class="flex items-center justify-center min-h-screen p-4">
             <div class="w-full max-w-lg p-6 bg-white rounded-lg shadow-xl">
                 <div id="modalContent">Loading...</div>
@@ -196,6 +208,22 @@
         </div>
     </div>
 
+    <!-- Modal for Confirmation Disconnect -->
+    <div id="confirmDisconnectModal" class="fixed inset-0 z-50 hidden bg-gray-500 bg-opacity-75" role="dialog"
+        aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="w-full max-w-lg p-6 bg-white rounded-lg shadow-xl">
+                <h2 class="text-lg font-bold">Confirm Disconnect</h2>
+                <p id="confirmDisconnectMessage">Are you sure you want to disconnect this device?</p>
+                <div class="flex justify-end mt-4">
+                    <button class="px-4 py-2 text-white bg-red-500 rounded hover:bg-red-600"
+                        onclick="disconnectDeviceConfirmed()">Disconnect</button>
+                    <button class="px-4 py-2 ml-2 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+                        onclick="closeConfirmDisconnectModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         let deviceIdToDelete = null;
@@ -314,9 +342,50 @@
             document.getElementById('deviceModal').classList.add('hidden');
         }
 
+        function disconnectDevice(deviceToken) {
+            // Tampilkan loading pada tombol yang sesuai
+            const disconnectButton = document.querySelector(`.disconnectButton[data-device-token="${deviceToken}"]`);
+            const disconnectSpinner = disconnectButton.querySelector('.disconnectSpinner');
+
+            disconnectButton.disabled = true; // Nonaktifkan tombol
+            disconnectSpinner.classList.remove('hidden'); // Tampilkan spinner
+
+            // Lakukan fetch untuk memproses disconnect
+            fetch('{{ route('devices.disconnect') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        token: deviceToken
+                    })
+                })
+                .then(response => response.json()) // Parsing respons JSON
+                .then(data => {
+                    if (data.message) {
+                        alert('Device successfully disconnected.');
+                        location.reload(); // Refresh halaman setelah sukses
+                    } else if (data.error) {
+                        alert('Failed to disconnect device: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while disconnecting the device.');
+                })
+                .finally(() => {
+                    // Kembalikan tombol ke keadaan semula
+                    disconnectButton.disabled = false; // Aktifkan kembali tombol
+                    disconnectSpinner.classList.add('hidden'); // Sembunyikan spinner
+                });
+        }
+
+
         function confirmDelete(deviceId, deviceName) {
             deviceIdToDelete = deviceId; // Store the device ID to delete
-            document.getElementById('confirmDeleteMessage').innerText = `Are you sure you want to delete the device "${deviceName}"?`;
+            document.getElementById('confirmDeleteMessage').innerText =
+                `Are you sure you want to delete the device "${deviceName}"?`;
             document.getElementById('confirmDeleteModal').classList.remove('hidden'); // Show confirmation modal
         }
 
@@ -333,20 +402,20 @@
             if (otp) {
 
                 axios.post('/devices/' + deviceIdToDelete, {
-                    '_token': "{{ csrf_token() }}",
-                    '_method': "DELETE",
-                    'otp': otp
-                }).then((response) => {
-                    document.getElementById('otpDeleteAuthorization').classList.add('hidden');
-                    deviceIdToDelete = null
-                    window.location.reload()
-                    return;
-                })
-                .catch((error) => {
-                    errorMessage.textContent = error.response.data.error;
-                    errorContainer.classList.remove('hidden');
-                    return;
-                })
+                        '_token': "{{ csrf_token() }}",
+                        '_method': "DELETE",
+                        'otp': otp
+                    }).then((response) => {
+                        document.getElementById('otpDeleteAuthorization').classList.add('hidden');
+                        deviceIdToDelete = null
+                        window.location.reload()
+                        return;
+                    })
+                    .catch((error) => {
+                        errorMessage.textContent = error.response.data.error;
+                        errorContainer.classList.remove('hidden');
+                        return;
+                    })
             }
 
             if (deviceIdToDelete) {

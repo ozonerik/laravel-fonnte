@@ -55,27 +55,6 @@ class DeviceController extends Controller
         return view('devices.index', compact('devices', 'page_title'));
     }
 
-
-    private function fetchDeviceStatuses()
-    {
-        $accountToken = config('services.fonnte.token'); // Assuming you have your token stored in config/services.php
-        $curl = curl_init();
-
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => 'https://api.fonnte.com/get-devices',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => array(
-                'Authorization: ' . $accountToken,
-            ),
-        ));
-
-        $response = curl_exec($curl);
-        curl_close($curl);
-
-        return json_decode($response, true);
-    }
-
-
     public function create()
     {
         return view('devices.create'); // Menampilkan halaman form penambahan device
@@ -127,20 +106,11 @@ class DeviceController extends Controller
 
     public function activateDevice(Request $request)
     {
-        $deviceToken = $request->input('token'); // Get the device token from the request
-
-        // Assuming you need the WhatsApp number associated with the device
-        $device = Device::where('token', $deviceToken)->first();
-
-        if (!$device) {
-            return response()->json([
-                'status' => false,
-                'error' => 'Device not found.'
-            ], 404);
-        }
+        $phoneNumber = $request->input('device');
+        $deviceToken = $request->input('token');
 
         // Call the FonnteService to activate the device using its WhatsApp number
-        $response = $this->fonnteService->requestQRActivation($device->device, $deviceToken);
+        $response = $this->fonnteService->requestQRActivation($phoneNumber, $deviceToken);
 
         if ($response['status']) {
             // Assuming the QR code is returned in the 'url' key
@@ -172,6 +142,25 @@ class DeviceController extends Controller
             'status' => false,
             'error' => 'Gagal mendapatkan profil perangkat: ' . $response['error']
         ], 500);
+    }
+
+    public function disconnect(Request $request)
+    {
+        try {
+            $deviceToken = $request->input('token');
+            $response = $this->fonnteService->disconnectDevice($deviceToken);
+
+            // Jika API mengembalikan status sukses
+            if ($response['status'] === true) {
+                return response()->json(['message' => 'Device disconnected successfully'], 200); // Status 200 untuk sukses
+            }
+
+            // Jika terjadi kesalahan pada respons dari API
+            return response()->json(['error' => $response['error'] ?? 'Failed to disconnect device'], 500);
+        } catch (\Exception $e) {
+            Log::error($e->getMessage());
+            return response()->json(['error' => 'Internal Server Error'], 500);
+        }
     }
 
     // Menghapus perangkat
