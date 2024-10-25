@@ -535,21 +535,40 @@
         }
 
         function copyToClipboard(token) {
-            navigator.clipboard.writeText(token).then(() => {
-                // Show the styled notification
-                const notification = document.getElementById('notification');
-                const notificationMessage = document.getElementById('notificationMessage');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(token).then(() => {
+                    showNotification(token);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement("textarea");
+                textArea.value = token;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    console.log('Fallback: Token copied successfully');
+                    showNotification(token);
+                } catch (err) {
+                    console.error('Fallback: Failed to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
 
+        function showNotification(token) {
+            const notification = document.getElementById('notification');
+            const notificationMessage = document.getElementById('notificationMessage');
+            if (notification && notificationMessage) {
                 notificationMessage.innerText = 'Token copied to clipboard: ' + token;
                 notification.classList.remove('hidden'); // Show the notification
 
-                // Hide the notification after 3 seconds
                 setTimeout(() => {
                     notification.classList.add('hidden');
                 }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-            });
+            }
         }
     </script>
 </x-app-layout>
