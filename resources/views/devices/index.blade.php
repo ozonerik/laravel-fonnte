@@ -133,7 +133,7 @@
         <div class="flex items-center justify-center min-h-screen p-4">
             <div class="w-full max-w-lg p-6 bg-white rounded-lg shadow-xl">
                 <h2 class="text-lg font-bold">Otorisasi</h2>
-                <p id="confirmDeleteMessage">Masukan kode OTP yang dikirimkan ke nomor ini</p>
+                <p id="confirmDeleteMessage">Masukkan kode OTP yang dikirimkan ke nomor Anda.</p>
                 <div id="errorContainerOTP" class="hidden mb-4">
                     <p class="font-medium text-red-500" id="errorMessageOTP"></p>
                 </div>
