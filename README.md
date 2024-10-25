@@ -4,10 +4,12 @@
 
 <h2>Fitur</h2>
 <ol>
+    <li>Send Message</li>
     <li>List All Devices</li>
     <li>Create New Device</li>
-    <li>Connect Device</li>
-    <li>Send Message</li>
+    <li>Connect Device via QR Code</li>
+    <li>Disconnect Device</li>
+    <li>Delete Device</li>
 </ol>
 
 <h2>Cara Install</h2>
