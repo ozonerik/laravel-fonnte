@@ -2,117 +2,42 @@
     let deviceIdToDelete = null;
 
     function activateDevice(deviceToken, buttonElement) {
-        // Show loading state
-        buttonElement.innerHTML = 'Loading...'; // Change button text to "Loading"
-        buttonElement.disabled = true; // Disable the button to prevent multiple clicks
-        buttonElement.classList.add('bg-gray-400'); // Change color to indicate loading (optional)
+        // Mendapatkan konteks Alpine.js untuk mengakses variabel state
+        const alpineContext = Alpine.$data(buttonElement.closest('[x-data]'));
 
-        fetch('/devices/activate', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    token: deviceToken
-                }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Reset button state
-                buttonElement.innerHTML = 'Connect'; // Reset button text
-                buttonElement.disabled = false; // Enable the button
-                buttonElement.classList.remove('bg-gray-400'); // Reset button color
+        alpineContext.loading = true; // Tampilkan loading
+        alpineContext.isOpen = true; // Buka modal
 
-                if (data.status) {
-                    // Show the QR code in modal
-                    const qrImage =
-                        `<img src="data:image/png;base64,${data.url}" alt="QR Code" style="width: 200px; height: 200px;">`;
-                    document.getElementById('modalContent').innerHTML = qrImage;
-                    showModal(); // Function to show the modal
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // Reset button state in case of error
-                buttonElement.innerHTML = 'Connect'; // Reset button text
-                buttonElement.disabled = false; // Enable the button
-                buttonElement.classList.remove('bg-gray-400'); // Reset button color
-            });
+        // Fetch request untuk mengaktifkan perangkat dan mendapatkan QR code
+        fetch('{{ route('devices.activate') }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: deviceToken }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status) {
+                const qrImage = `<img src="data:image/png;base64,${data.url}" alt="QR Code" style="width: 200px; height: 200px;">`;
+                alpineContext.qrCode = qrImage; // Atur QR Code ke variabel Alpine
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while activating the device.');
+        })
+        .finally(() => {
+            alpineContext.loading = false; // Sembunyikan loading
+        });
     }
 
     function showModal() {
         const modal = document.getElementById('deviceModal');
-        modal.classList.remove('hidden'); // Show the modal
-    }
-
-    function closeDeviceModal() {
-        document.getElementById('deviceModal').classList.add('hidden'); // Hide the modal
-        location.reload(); // Refresh the page
-    }
-
-    function fetchDeviceStatus() {
-        fetch('/devices/status', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    const statusContent = document.getElementById('statusContent');
-                    statusContent.innerHTML = '';
-
-                    // Iterate through the devices and display their status
-                    data.data.forEach(device => {
-                        const deviceInfo = `<div>
-                <strong>${device.name} (${device.device})</strong> - Status: ${device.status}
-            </div>`;
-                        statusContent.innerHTML += deviceInfo;
-                    });
-
-                    document.getElementById('deviceStatus').classList.remove('hidden'); // Show status section
-                } else {
-                    alert('Error fetching device status: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-    }
-
-    function showDeviceModal(deviceId) {
-        const modal = document.getElementById('deviceModal');
         modal.classList.remove('hidden');
-
-        document.getElementById('modalContent').innerHTML = 'Loading...';
-
-        fetch(`/devices/${deviceId}`, {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                document.getElementById('modalContent').innerHTML = data.html;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('modalContent').innerHTML = 'Failed to load device details.';
-            });
-    }
-
-    function closeDeviceModal() {
-        document.getElementById('deviceModal').classList.add('hidden');
     }
 
     function disconnectDevice(deviceToken) {
@@ -153,7 +78,6 @@
                 disconnectSpinner.classList.add('hidden'); // Sembunyikan spinner
             });
     }
-
 
     function confirmDelete(deviceId, deviceName) {
         deviceIdToDelete = deviceId; // Store the device ID to delete
