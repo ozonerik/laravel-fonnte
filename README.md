@@ -32,6 +32,8 @@
 4. Jalankan perintah:
 <br>composer install
 <br>php artisan key:generate
+<br>npm install vite
+<br>npm run build
 <br>php artisan migrate --seed
 <br>php artisan serve
 
